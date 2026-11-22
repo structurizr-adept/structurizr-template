@@ -1,0 +1,46 @@
+name: Build and deploy Structurizr
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'structurizr/workspace.dsl'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Generate static site
+        run: |
+          mkdir ./structurizr/build
+          
+          docker run --rm -u "$(id -u):$(id -g)" -v ./structurizr:/usr/local/structurizr structurizr/structurizr:latest \
+          export -workspace workspace.dsl -format static -output build
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: ./structurizr/build
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
